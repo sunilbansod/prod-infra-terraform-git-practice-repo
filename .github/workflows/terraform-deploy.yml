@@ -1,10 +1,15 @@
 name: Terraform Deploy
 
 on:
-  push:
+  # Trigger when code is merged (PR closed & merged) into main branch
+  pull_request:
     branches:
       - main
-  workflow_dispatch: # Allow manual trigger too
+    types:
+      - closed
+
+  # Trigger manually as well
+  workflow_dispatch:
 
 permissions:
   contents: read

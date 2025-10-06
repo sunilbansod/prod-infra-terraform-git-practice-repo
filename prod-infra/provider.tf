@@ -7,7 +7,7 @@ terraform {
     }
   }
 
-  # Backend configuration for state management in s3 bucket
+  # Backend configuration for state management, bucket should present in aws account
   backend "s3" {
     bucket  = "sunil-git-my-terraform-state-bucket"
     key     = "prod-infra-terraform.tfstate"

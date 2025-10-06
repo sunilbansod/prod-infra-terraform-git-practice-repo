@@ -7,14 +7,14 @@ terraform {
     }
   }
 
-  # Backend configuration for state management in s3 bucket
+  # Backend configuration for state management, bucket should present in aws account
   backend "s3" {
-    bucket         = "sunil-my-terraform-state-bucket"
-    key            = "prod-infra-terraform.tfstate"
-    region         = "ap-south-1"
-    encrypt        = true
+    bucket  = "sunil-git-my-terraform-state-bucket"
+    key     = "prod-infra-terraform.tfstate"
+    region  = "ap-south-1"
+    encrypt = true
     #use_lockfile   = true
-    #dynamodb_table = "terraform-lock-table"  # This DynamoDB table must exist in your AWS account
+    #dynamodb_table = "terraform-lock-table"  # DynamoDB table must exist in your AWS account
   }
 }
 

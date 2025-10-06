@@ -1,121 +1,113 @@
-name: Terraform Deploy
+name: Terraform CI/CD
 
 on:
   push:
     branches:
-      - main 
-  # Trigger when code is merged (PR closed & merged) into main branch
+      - main
   pull_request:
     branches:
       - main
-    types:
-      - closed
-
-  # Trigger manually as well
-  workflow_dispatch:
 
 permissions:
   contents: read
+  pull-requests: write
+  id-token: write
 
 env:
-  AWS_REGION: ap-south-1
-  TF_WORKING_DIR: prod-infra
+  TF_VERSION: 1.6.6
+  WORKING_DIR: prod-infra
 
 jobs:
-  terraform:
-    name: Terraform Init, Validate, Plan
+  terraform-plan:
+    name: Terraform Plan
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: ${{ env.TF_WORKING_DIR }}
-
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+      - name: Configure AWS Credentials
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          echo "✅ AWS credentials configured."
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.9.8
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Format
+        run: terraform fmt -check
+        working-directory: ${{ env.WORKING_DIR }}
 
       - name: Terraform Init
         run: terraform init
-
-      - name: Terraform Format Check
-        run: terraform fmt -check
+        working-directory: ${{ env.WORKING_DIR }}
 
       - name: Terraform Validate
         run: terraform validate
+        working-directory: ${{ env.WORKING_DIR }}
 
       - name: Terraform Plan
         id: plan
-        run: terraform plan -no-color -out=tfplan
+        run: terraform plan -out=tfplan.out
+        working-directory: ${{ env.WORKING_DIR }}
 
-      - name: Upload Plan File
+      - name: Upload Plan Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: terraform-plan
-          path: ${{ env.TF_WORKING_DIR }}/tfplan
+          name: tfplan
+          path: ${{ env.WORKING_DIR }}/tfplan.out
 
-  manual_approval:
-    name: Manual Approval (Click Play to Continue)
-    needs: terraform
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged == true && github.base_ref == 'main') }}
-
-    steps:
-      - name: Await Manual Approval
-        run: |
-          echo "✅ Terraform Plan completed successfully."
-          echo "📝 Please review the plan artifact before applying."
-          echo "▶️ Click the 'Run job' (play button) in this step to continue to Apply."
-
-  apply:
-    name: Terraform Apply (Manual Trigger)
-    needs: manual_approval
+  manual-approval:
+    name: Manual Approval (Apply/Reject)
+    needs: terraform-plan
     runs-on: ubuntu-latest
     environment:
-      name: production   # 👈 Add manual reviewers under Repo → Settings → Environments → production
-
-    defaults:
-      run:
-        working-directory: ${{ env.TF_WORKING_DIR }}
+      name: production
 
     steps:
-      - name: Checkout repository
+      - name: Wait for Manual Approval
+        run: |
+          echo "✅ Awaiting manual approval to apply Terraform changes."
+          echo "Please approve or reject this deployment in the 'Environments' tab of GitHub."
+
+  terraform-apply:
+    name: Terraform Apply
+    needs: manual-approval
+    runs-on: ubuntu-latest
+    if: ${{ needs.manual-approval.result == 'success' }}
+
+    steps:
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+      - name: Configure AWS Credentials
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          echo "✅ AWS credentials configured."
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.9.8
+          terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Download Plan File
+      - name: Download Plan Artifact
         uses: actions/download-artifact@v4
         with:
-          name: terraform-plan
-          path: ${{ env.TF_WORKING_DIR }}
+          name: tfplan
+          path: ${{ env.WORKING_DIR }}
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ${{ env.WORKING_DIR }}
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve tfplan
-
-      - name: Deployment Success Notification
-        if: success()
-        run: |
-          echo "✅ Terraform apply completed successfully!"
-          echo "🚀 Infrastructure deployed to AWS."
+        run: terraform apply -auto-approve tfplan.out
+        working-directory: ${{ env.WORKING_DIR }}

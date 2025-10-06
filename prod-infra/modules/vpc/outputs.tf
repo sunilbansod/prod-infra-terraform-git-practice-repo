@@ -1,4 +1,4 @@
-output "vpc_id" {
+/*output "vpc_id" {
   description = "ID of the VPC"
   value       = aws_vpc.main.id
 }
@@ -37,3 +37,4 @@ output "private_route_table_ids" {
   description = "IDs of private route tables"
   value       = aws_route_table.private[*].id
 }
+*/

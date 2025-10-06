@@ -4,6 +4,7 @@ variable "project_name" {
   default     = "test-cicd"
 }
 
+/*
 variable "vpc_cidr" {
   description = "CIDR block for VPC"
   type        = string
@@ -50,3 +51,4 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+*/

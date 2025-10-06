@@ -1,7 +1,22 @@
-name: Terraform CI/CD
+name: Terraform CI/CD with Manual Deploy
 
 on:
-  workflow_dispatch:   # ✅ Manual trigger only
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: 'Do you want to deploy Terraform changes to AWS?'
+        required: true
+        default: 'no'
+        type: choice
+        options:
+          - 'no'
+          - 'yes'
 
 permissions:
   contents: read
@@ -16,8 +31,7 @@ jobs:
   terraform-plan:
     name: Terraform Plan
     runs-on: ubuntu-latest
-
-    env:   # ✅ Make AWS credentials available to all steps in this job
+    env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_REGION: ${{ secrets.AWS_REGION }}
@@ -31,7 +45,7 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Terraform Format
+      - name: Terraform Format Check
         run: terraform fmt -check
         working-directory: ${{ env.WORKING_DIR }}
 
@@ -54,27 +68,12 @@ jobs:
           name: tfplan
           path: ${{ env.WORKING_DIR }}/tfplan.out
 
-  manual-approval:
-    name: Manual Approval (Apply/Reject)
-    needs: terraform-plan
-    runs-on: ubuntu-latest
-    environment:
-      name: production
-      url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-    steps:
-      - name: Wait for Manual Approval
-        run: |
-          echo "✅ Awaiting manual approval to apply Terraform changes."
-          echo "Please approve or reject this deployment in the 'Environments' tab of GitHub."
-
   terraform-apply:
-    name: Terraform Apply
-    needs: manual-approval
+    name: Terraform Apply (Manual Deploy)
+    needs: terraform-plan
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.deploy == 'yes' }}
     runs-on: ubuntu-latest
-    if: ${{ needs.manual-approval.result == 'success' }}
-
-    env:   # ✅ Make AWS credentials available here too
+    env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_REGION: ${{ secrets.AWS_REGION }}

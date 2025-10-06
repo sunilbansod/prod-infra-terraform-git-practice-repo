@@ -10,7 +10,7 @@ resource "aws_vpc" "main" {
     }
   )
 }
-
+/*
 # Internet Gateway
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
@@ -22,6 +22,7 @@ resource "aws_internet_gateway" "main" {
     }
   )
 }
+*/
 /*
 # Public Subnets
 resource "aws_subnet" "public" {

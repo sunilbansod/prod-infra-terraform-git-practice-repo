@@ -14,7 +14,7 @@ terraform {
     region  = "ap-south-1"
     encrypt = true
     #use_lockfile   = true
-    #dynamodb_table = "terraform-lock-table"  # This DynamoDB table must exist in your AWS account
+    #dynamodb_table = "terraform-lock-table"  # DynamoDB table must exist in your AWS account
   }
 }
 

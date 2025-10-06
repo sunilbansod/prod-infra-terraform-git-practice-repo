@@ -9,7 +9,7 @@ terraform {
 
   # Backend configuration for state management in s3 bucket
   backend "s3" {
-    bucket         = "sunil-my-terraform-state-bucket"
+    bucket         = "sunil-git-my-terraform-state-bucket"
     key            = "prod-infra-terraform.tfstate"
     region         = "ap-south-1"
     encrypt        = true

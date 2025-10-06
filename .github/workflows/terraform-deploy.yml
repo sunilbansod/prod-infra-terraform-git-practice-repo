@@ -33,16 +33,20 @@ jobs:
 
       - name: Terraform Format
         run: terraform fmt -check
+        working-directory: ${{ env.WORKING_DIR }}
 
       - name: Terraform Init
         run: terraform init
+        working-directory: ${{ env.WORKING_DIR }}
 
       - name: Terraform Validate
         run: terraform validate
+        working-directory: ${{ env.WORKING_DIR }}
 
       - name: Terraform Plan
         id: plan
         run: terraform plan -out=tfplan.out
+        working-directory: ${{ env.WORKING_DIR }}
 
       - name: Upload Plan Artifact
         uses: actions/upload-artifact@v4
@@ -56,7 +60,6 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production
-      # 👇 GitHub environment can require approvers (configured in repo settings)
       url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
     steps:
@@ -69,7 +72,9 @@ jobs:
     name: Terraform Apply
     needs: manual-approval
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    # This ensures 'apply' only runs after manual approval succeeds
+    if: ${{ needs.manual-approval.result == 'success' }}
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -87,6 +92,8 @@ jobs:
 
       - name: Terraform Init
         run: terraform init
+        working-directory: ${{ env.WORKING_DIR }}
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan.out
+        working-directory: ${{ env.WORKING_DIR }}

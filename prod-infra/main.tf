@@ -8,8 +8,8 @@ module "vpc" {
   #availability_zones   = ["ap-south-1a", "ap-south-1b"]
   #enable_nat_gateway   = true
 
-  tags = {
-    Environment = "prod"
-    Terraform   = "true"
-  }
+ # tags = {
+  #  Environment = "prod"
+   # Terraform   = "true"
+  #}
 }

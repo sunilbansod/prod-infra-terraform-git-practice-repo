@@ -4,13 +4,14 @@ variable "project_name" {
   default     = "test-cicd"
 }
 
-/*
+
 variable "vpc_cidr" {
   description = "CIDR block for VPC"
   type        = string
   default     = "10.0.0.0/16"
 }
 
+/*
 variable "public_subnet_cidrs" {
   description = "CIDR blocks for public subnets"
   type        = list(string)
@@ -34,6 +35,7 @@ variable "enable_nat_gateway" {
   default     = true
 }
 
+*/
 variable "enable_dns_hostnames" {
   description = "Enable DNS hostnames in VPC"
   type        = bool
@@ -46,6 +48,7 @@ variable "enable_dns_support" {
   default     = true
 }
 
+/*
 variable "tags" {
   description = "Tags to apply to resources"
   type        = map(string)

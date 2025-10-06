@@ -63,21 +63,24 @@ jobs:
           path: ${{ env.TF_WORKING_DIR }}/tfplan
 
   manual_approval:
-    name: Manual Approval
+    name: Manual Approval (Click Play to Continue)
     needs: terraform
     runs-on: ubuntu-latest
-    environment:
-      name: production  # Set up "production" environment in GitHub → Settings → Environments
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged == true && github.base_ref == 'main') }}
+
     steps:
-      - name: Wait for approval
-        run: 
-            echo "Terraform plan has been generated and uploaded please review it"
-            echo "✅ Approved to apply Terraform changes."
+      - name: Await Manual Approval
+        run: |
+          echo "✅ Terraform Plan completed successfully."
+          echo "📝 Please review the plan artifact before applying."
+          echo "▶️ Click the 'Run job' (play button) in this step to continue to Apply."
 
   apply:
-    name: Terraform Apply
+    name: Terraform Apply (Manual Trigger)
     needs: manual_approval
     runs-on: ubuntu-latest
+    environment:
+      name: production   # 👈 Add manual reviewers under Repo → Settings → Environments → production
 
     defaults:
       run:
@@ -112,4 +115,4 @@ jobs:
         if: success()
         run: |
           echo "✅ Terraform apply completed successfully!"
-          echo "🚀 Infrastructure has been deployed to AWS"
+          echo "🚀 Infrastructure deployed to AWS."

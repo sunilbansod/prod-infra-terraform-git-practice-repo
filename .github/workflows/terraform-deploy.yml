@@ -1,12 +1,7 @@
 name: Terraform CI/CD
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+  workflow_dispatch:   # ✅ Manual trigger only
 
 permissions:
   contents: read
@@ -22,17 +17,14 @@ jobs:
     name: Terraform Plan
     runs-on: ubuntu-latest
 
+    env:   # ✅ Make AWS credentials available to all steps in this job
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-
-      - name: Configure AWS Credentials
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-        run: |
-          echo "✅ AWS credentials configured."
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -68,6 +60,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production
+      url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
     steps:
       - name: Wait for Manual Approval
@@ -81,17 +74,14 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ needs.manual-approval.result == 'success' }}
 
+    env:   # ✅ Make AWS credentials available here too
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-
-      - name: Configure AWS Credentials
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-        run: |
-          echo "✅ AWS credentials configured."
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3

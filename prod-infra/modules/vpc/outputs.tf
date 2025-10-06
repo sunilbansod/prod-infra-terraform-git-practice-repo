@@ -2,7 +2,7 @@ output "vpc_id" {
   description = "ID of the VPC"
   value       = aws_vpc.main.id
 }
-
+/*
 output "vpc_cidr" {
   description = "CIDR block of the VPC"
   value       = aws_vpc.main.cidr_block
@@ -37,3 +37,4 @@ output "private_route_table_ids" {
   description = "IDs of private route tables"
   value       = aws_route_table.private[*].id
 }
+*/

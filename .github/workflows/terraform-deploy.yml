@@ -1,6 +1,9 @@
 name: Terraform Deploy
 
 on:
+  push:
+    branches:
+      - main 
   # Trigger when code is merged (PR closed & merged) into main branch
   pull_request:
     branches:

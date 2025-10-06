@@ -7,7 +7,7 @@ terraform {
     }
   }
 
-  # Backend configuration for state management
+  # Backend configuration for state management in s3 bucket
   backend "s3" {
     bucket         = "sunil-my-terraform-state-bucket"
     key            = "prod-infra-terraform.tfstate"

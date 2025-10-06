@@ -32,17 +32,17 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
 
       - name: Terraform Format
-        run: terraform -chdir=${{ env.WORKING_DIR }} fmt -check
+        run: terraform fmt -check
 
       - name: Terraform Init
-        run: terraform -chdir=${{ env.WORKING_DIR }} init
+        run: terraform init
 
       - name: Terraform Validate
-        run: terraform -chdir=${{ env.WORKING_DIR }} validate
+        run: terraform validate
 
       - name: Terraform Plan
         id: plan
-        run: terraform -chdir=${{ env.WORKING_DIR }} plan -out=tfplan.out
+        run: terraform plan -out=tfplan.out
 
       - name: Upload Plan Artifact
         uses: actions/upload-artifact@v4
@@ -86,7 +86,7 @@ jobs:
           path: ${{ env.WORKING_DIR }}
 
       - name: Terraform Init
-        run: terraform -chdir=${{ env.WORKING_DIR }} init
+        run: terraform init
 
       - name: Terraform Apply
-        run: terraform -chdir=${{ env.WORKING_DIR }} apply -auto-approve tfplan.out
+        run: terraform apply -auto-approve tfplan.out

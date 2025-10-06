@@ -11,6 +11,6 @@ module "vpc" {
  /* tags = {
     Environment = "prod"
     Terraform   = "true"
-  }
+  }*/
 }
-*/
+

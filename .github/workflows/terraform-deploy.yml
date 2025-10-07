@@ -1,14 +1,12 @@
-name: Terraform CI/CD with Auto Apply After Merge
+name: Terraform CI/CD (Apply After Merge Only)
 
 on:
+  push:
+    branches:
+      - main  # ✅ triggers only when code is merged into main
   pull_request:
     branches:
       - main
-    types:
-      - opened
-      - synchronize
-      - reopened
-      - closed   # Needed to detect when PR is merged
   workflow_dispatch:
     inputs:
       deploy:
@@ -34,6 +32,7 @@ jobs:
     name: Terraform Plan
     runs-on: ubuntu-latest
 
+    # ✅ Run plan on PR creation or update (not on merge)
     if: github.event_name == 'pull_request' && github.event.action != 'closed'
 
     defaults:
@@ -76,8 +75,8 @@ jobs:
   terraform-apply:
     name: Terraform Apply (Auto After Merge)
     needs: terraform-plan
-    # ✅ This condition ensures apply runs ONLY when PR is merged to main
-    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true && github.base_ref == 'main'
+    # ✅ Runs ONLY when code is merged into main (push to main)
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
 
     defaults:
@@ -98,17 +97,11 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Download Plan Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: tfplan
-          path: ${{ env.TF_WORKING_DIR }}
-
       - name: Terraform Init
         run: terraform init
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve tfplan.out
+        run: terraform apply -auto-approve
 
       - name: Deployment Success Notification
         if: success()

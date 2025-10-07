@@ -1,16 +1,18 @@
-name: Terraform CI/CD with Manual Deploy
+name: Terraform CI/CD with Auto Apply After Merge
 
 on:
-  push:
-    branches:
-      - main
   pull_request:
     branches:
       - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - closed   # Needed to detect when PR is merged
   workflow_dispatch:
     inputs:
       deploy:
-        description: 'Do you want to deploy Terraform changes to AWS?'
+        description: 'Do you want to deploy Terraform changes to AWS manually?'
         required: true
         default: 'No'
         type: choice
@@ -31,6 +33,8 @@ jobs:
   terraform-plan:
     name: Terraform Plan
     runs-on: ubuntu-latest
+
+    if: github.event_name == 'pull_request' && github.event.action != 'closed'
 
     defaults:
       run:
@@ -70,9 +74,10 @@ jobs:
           path: ${{ env.TF_WORKING_DIR }}/tfplan.out
 
   terraform-apply:
-    name: Terraform Apply (Manual Deploy)
+    name: Terraform Apply (Auto After Merge)
     needs: terraform-plan
-    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.deploy == 'Yes' }}
+    # ✅ This condition ensures apply runs ONLY when PR is merged to main
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true && github.base_ref == 'main'
     runs-on: ubuntu-latest
 
     defaults:

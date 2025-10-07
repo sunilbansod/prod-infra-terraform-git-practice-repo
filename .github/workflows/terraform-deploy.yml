@@ -1,4 +1,4 @@
-name: Terraform CI/CD (Plan on PR, Apply on Merge)
+name: Terraform CI/CD (Plan + Apply After Merge)
 
 on:
   pull_request:
@@ -53,7 +53,24 @@ jobs:
 
       - name: Terraform Plan
         id: plan
-        run: terraform plan
+        run: terraform plan -out=tfplan.out
+
+      - name: Save Plan Output (for visibility)
+        run: terraform show -no-color tfplan.out > plan-output.txt
+
+      - name: Upload Plan Files
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: |
+            ${{ env.TF_WORKING_DIR }}/tfplan.out
+            ${{ env.TF_WORKING_DIR }}/plan-output.txt
+
+      - name: Show Plan in PR
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: terraform-plan
+          path: ${{ env.TF_WORKING_DIR }}/plan-output.txt
 
   terraform-apply:
     name: Terraform Apply (After Merge)
@@ -78,11 +95,25 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
+      - name: Download Plan Artifact (Optional)
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+          path: ${{ env.TF_WORKING_DIR }}
+        continue-on-error: true
+
       - name: Terraform Init
         run: terraform init
 
+      - name: Terraform Plan (Before Apply)
+        id: plan-verify
+        run: terraform plan -out=tfplan-apply.out
+
+      - name: Show Apply Plan Output
+        run: terraform show -no-color tfplan-apply.out
+
       - name: Terraform Apply
-        run: terraform apply -auto-approve
+        run: terraform apply -auto-approve tfplan-apply.out
 
       - name: Deployment Success Notification
         if: success()

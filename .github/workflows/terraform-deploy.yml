@@ -1,22 +1,13 @@
-name: Terraform CI/CD (Apply After Merge Only)
+name: Terraform CI/CD (Plan on PR, Apply on Merge)
 
 on:
-  push:
-    branches:
-      - main  # ✅ triggers only when code is merged into main
   pull_request:
     branches:
       - main
-  workflow_dispatch:
-    inputs:
-      deploy:
-        description: 'Do you want to deploy Terraform changes to AWS manually?'
-        required: true
-        default: 'No'
-        type: choice
-        options:
-          - 'No'
-          - 'Yes'
+    types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -29,11 +20,9 @@ env:
 
 jobs:
   terraform-plan:
-    name: Terraform Plan
+    name: Terraform Plan (PR)
     runs-on: ubuntu-latest
-
-    # ✅ Run plan on PR creation or update (not on merge)
-    if: github.event_name == 'pull_request' && github.event.action != 'closed'
+    if: github.event_name == 'pull_request'
 
     defaults:
       run:
@@ -64,20 +53,12 @@ jobs:
 
       - name: Terraform Plan
         id: plan
-        run: terraform plan -out=tfplan.out
-
-      - name: Upload Plan Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: tfplan
-          path: ${{ env.TF_WORKING_DIR }}/tfplan.out
+        run: terraform plan
 
   terraform-apply:
-    name: Terraform Apply (Auto After Merge)
-    needs: terraform-plan
-    # ✅ Runs ONLY when code is merged into main (push to main)
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    name: Terraform Apply (After Merge)
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     defaults:
       run:

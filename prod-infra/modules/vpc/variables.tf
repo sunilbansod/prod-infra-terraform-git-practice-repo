@@ -48,9 +48,14 @@ variable "enable_dns_support" {
   default     = true
 }
 
-/*variable "tags" {
+variable "tags" {
   description = "Tags to apply to resources"
   type        = map(string)
-  default     = {}
+  default = {
+    Environment = "dev"
+    ManagedBy   = "Terraform"
+    Project     = "MyProject"
+    Owner       = "DevOps Team"
+  }
 }
-*/
+

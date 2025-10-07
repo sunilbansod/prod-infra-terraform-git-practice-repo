@@ -1,0 +1,77 @@
+name: Terraform Destroy (Manual Trigger Only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_destroy:
+        description: 'Are you sure you want to destroy all AWS infrastructure?'
+        required: true
+        default: 'No'
+        type: choice
+        options:
+          - 'No'
+          - 'Yes'
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  TF_VERSION: 1.6.6
+  TF_WORKING_DIR: prod-infra
+
+jobs:
+  terraform-destroy:
+    name: Terraform Destroy (Manual Only)
+    runs-on: ubuntu-latest
+
+    # ✅ Only run if user selects "Yes"
+    if: github.event.inputs.confirm_destroy == 'Yes'
+
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Destroy Plan
+        id: plan
+        run: terraform plan -destroy -out=tfdestroy.out
+
+      - name: Show Destroy Plan Output
+        run: terraform show -no-color tfdestroy.out > destroy-plan-output.txt
+
+      - name: Upload Destroy Plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfdestroy-plan
+          path: |
+            ${{ env.TF_WORKING_DIR }}/tfdestroy.out
+            ${{ env.TF_WORKING_DIR }}/destroy-plan-output.txt
+
+      - name: Terraform Destroy Apply
+        run: terraform apply -auto-approve tfdestroy.out
+
+      - name: Destroy Success Notification
+        if: success()
+        run: |
+          echo "💣 Terraform destroy completed successfully!"
+          echo "✅ All AWS infrastructure has been removed!"

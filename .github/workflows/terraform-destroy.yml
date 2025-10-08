@@ -1,20 +1,21 @@
-name: Terraform Destroy (Manual Trigger Only)
+name: Terraform Destroy (Manual Approval Required)
 
 on:
   workflow_dispatch:
     inputs:
       confirm_destroy:
-        description: 'Are you sure you want to destroy all AWS infrastructure?'
+        description: "⚠️ Are you sure you want to destroy all infrastructure?"
         required: true
-        default: 'No'
+        default: "No"
         type: choice
         options:
-          - 'No'
-          - 'Yes'
+          - "No"
+          - "Yes"
 
 permissions:
   contents: read
   id-token: write
+  deployments: write
 
 env:
   TF_VERSION: 1.6.6
@@ -22,11 +23,12 @@ env:
 
 jobs:
   terraform-destroy:
-    name: Terraform Destroy (Manual Only)
+    name: Terraform Destroy (Manual Approval)
     runs-on: ubuntu-latest
-
-    # ✅ Only run if user selects "Yes"
     if: github.event.inputs.confirm_destroy == 'Yes'
+    environment:
+      name: production
+      url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
     defaults:
       run:
@@ -38,7 +40,7 @@ jobs:
       AWS_REGION: ${{ secrets.AWS_REGION }}
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Terraform
@@ -46,32 +48,45 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Terraform Init
+      - name: Terraform init
         run: terraform init
 
-      - name: Terraform Validate
+      - name: Terraform validate
         run: terraform validate
 
-      - name: Terraform Destroy Plan
-        id: plan
-        run: terraform plan -destroy -out=tfdestroy.out
+      - name: Terraform plan (destroy preview)
+        id: destroy-plan
+        run: terraform plan -destroy -out=tfplan-destroy.out
 
-      - name: Show Destroy Plan Output
-        run: terraform show -no-color tfdestroy.out > destroy-plan-output.txt
+      - name: Save destroy plan output
+        run: terraform show -no-color tfplan-destroy.out > destroy-plan-output.txt
 
-      - name: Upload Destroy Plan
+      - name: Upload destroy plan artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: tfdestroy-plan
+          name: terraform-destroy-plan
           path: |
-            ${{ env.TF_WORKING_DIR }}/tfdestroy.out
+            ${{ env.TF_WORKING_DIR }}/tfplan-destroy.out
             ${{ env.TF_WORKING_DIR }}/destroy-plan-output.txt
 
-      - name: Terraform Destroy Apply
-        run: terraform apply -auto-approve tfdestroy.out
+      # --- Manual approval required here (GitHub Environment) ---
+      - name: Terraform destroy
+        run: terraform apply -auto-approve tfplan-destroy.out
 
-      - name: Destroy Success Notification
+      - name: Destroy success message
         if: success()
         run: |
-          echo "💣 Terraform destroy completed successfully!"
-          echo "✅ All AWS infrastructure has been removed!"
+          echo "✅ Terraform destroy completed successfully!"
+          echo "💥 All infrastructure has been destroyed from AWS region: ${{ env.AWS_REGION }}"
+
+      # Optional: Slack notification
+      # - name: Notify Slack
+      #   if: success()
+      #   uses: slackapi/slack-github-action@v1.24.0
+      #   with:
+      #     payload: |
+      #       {
+      #         "text": "⚠️ Terraform destroy executed successfully for *production* in ${{ env.AWS_REGION }}."
+      #       }
+      #   env:
+      #     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

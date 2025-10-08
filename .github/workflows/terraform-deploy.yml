@@ -72,8 +72,8 @@ jobs:
           header: terraform-plan
           path: ${{ env.TF_WORKING_DIR }}/plan-output.txt
 
-  terraform-apply:
-    name: Terraform Apply (After Merge)
+  terraform-deploy:
+    name: Terraform Plan + Apply (After Merge)
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
@@ -95,22 +95,27 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Download Plan Artifact (Optional)
-        uses: actions/download-artifact@v4
-        with:
-          name: tfplan
-          path: ${{ env.TF_WORKING_DIR }}
-        continue-on-error: true
-
       - name: Terraform Init
         run: terraform init
 
-      - name: Terraform Plan (Before Apply)
-        id: plan-verify
+      - name: Terraform Validate
+        run: terraform validate
+
+      # 🔹 Fresh plan at deploy time
+      - name: Terraform Plan (At Deploy)
+        id: plan-deploy
         run: terraform plan -out=tfplan-apply.out
 
-      - name: Show Apply Plan Output
-        run: terraform show -no-color tfplan-apply.out
+      - name: Show Plan Output
+        run: terraform show -no-color tfplan-apply.out > plan-apply-output.txt
+
+      - name: Upload Plan (Deploy)
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-apply
+          path: |
+            ${{ env.TF_WORKING_DIR }}/tfplan-apply.out
+            ${{ env.TF_WORKING_DIR }}/plan-apply-output.txt
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan-apply.out

@@ -12,6 +12,6 @@ module "vpc" {
     Environment = "prod"
     Terraform   = "true"
     Project     = "Test"
-    Owner       = "Infra-Team-03"
+    Owner       = "Infra-Team-0003"
   }
 }

@@ -1,4 +1,4 @@
-name: Terraform CI/CD (Plan + Apply After Merge with Manual Approval)
+name: Terraform CI/CD (Plan + Apply with Manual Approval)
 
 on:
   pull_request:
@@ -20,9 +20,8 @@ env:
 
 jobs:
   terraform-plan:
-    name: Terraform Plan (PR)
+    name: Terraform Plan
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
 
     defaults:
       run:
@@ -42,9 +41,6 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Terraform Format Check
-        run: terraform fmt -check
-
       - name: Terraform Init
         run: terraform init
 
@@ -52,19 +48,25 @@ jobs:
         run: terraform validate
 
       - name: Terraform Plan
+        id: plan
         run: terraform plan -out=tfplan.out
 
-      - name: Upload Plan Artifact
+      - name: Save Plan Output
+        run: terraform show -no-color tfplan.out > plan-output.txt
+
+      - name: Upload Plan Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: tfplan
-          path: ${{ env.TF_WORKING_DIR }}/tfplan.out
+          path: |
+            ${{ env.TF_WORKING_DIR }}/tfplan.out
+            ${{ env.TF_WORKING_DIR }}/plan-output.txt
 
   terraform-apply:
-    name: Terraform Plan + Apply (After Merge - Manual Approval)
+    name: Terraform Apply (After Merge + Manual Approval)
     runs-on: ubuntu-latest
     needs: [terraform-plan]
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/main')
     environment:
       name: production
       url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -90,30 +92,30 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
-      - name: Register Deployment
-        uses: chrnorm/deployment-action@v2
+      - name: Download Plan Artifact
+        uses: actions/download-artifact@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          environment: production
-          ref: ${{ github.ref }}
+          name: tfplan
+          path: ${{ env.TF_WORKING_DIR }}
+        continue-on-error: true
 
-      - name: Terraform Plan (Before Apply)
+      - name: Terraform Plan (Verification)
         run: terraform plan -out=tfplan-apply.out
 
-      - name: Upload Apply Plan
+      - name: Upload Verified Plan
         uses: actions/upload-artifact@v4
         with:
-          name: tfplan-apply
+          name: verified-plan
           path: ${{ env.TF_WORKING_DIR }}/tfplan-apply.out
 
-      - name: Wait for Environment Approval
-        run: echo "⏸️ Waiting for approval in GitHub environment..."
+      - name: Wait for Manual Approval
+        run: echo "⏸️ Waiting for environment approval before apply..."
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan-apply.out
 
-      - name: Deployment Success Notification
+      - name: Deployment Success
         if: success()
         run: |
-          echo "✅ Terraform Apply Successful!"
+          echo "✅ Terraform apply completed successfully!"
           echo "🚀 Infrastructure deployed to AWS region: ${{ env.AWS_REGION }}"

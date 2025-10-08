@@ -4,7 +4,6 @@ on:
   pull_request:
     branches:
       - main
-    types: [opened, synchronize, reopened]
   push:
     branches:
       - main
@@ -13,7 +12,7 @@ permissions:
   contents: read
   pull-requests: write
   id-token: write
-  deployments: write   # ✅ Required for environment deployments
+  deployments: write
 
 env:
   TF_VERSION: 1.6.6
@@ -24,18 +23,12 @@ jobs:
     name: Terraform Plan (PR)
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
-
     defaults:
       run:
         working-directory: ${{ env.TF_WORKING_DIR }}
 
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_REGION: ${{ secrets.AWS_REGION }}
-
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Terraform
@@ -45,51 +38,29 @@ jobs:
 
       - name: Terraform Init
         run: terraform init
-
-      - name: Terraform Validate
-        run: terraform validate
 
       - name: Terraform Plan
-        id: plan
         run: terraform plan -out=tfplan.out
 
-      - name: Show Plan Output
-        run: terraform show -no-color tfplan.out > plan-output.txt
-
-      - name: Upload Plan Files
+      - name: Upload Plan
         uses: actions/upload-artifact@v4
         with:
-          name: tfplan
-          path: |
-            ${{ env.TF_WORKING_DIR }}/tfplan.out
-            ${{ env.TF_WORKING_DIR }}/plan-output.txt
+          name: plan
+          path: ${{ env.TF_WORKING_DIR }}/tfplan.out
 
-      - name: Comment Plan in PR
-        uses: marocchino/sticky-pull-request-comment@v2
-        with:
-          header: terraform-plan
-          path: ${{ env.TF_WORKING_DIR }}/plan-output.txt
-
-  terraform-deploy:
+  terraform-apply:
     name: Terraform Plan + Apply (After Merge - Manual Approval)
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: terraform-plan
+    needs: [terraform-plan]
+    if: github.ref == 'refs/heads/main' # ✅ Simplified check
     environment:
-      name: production   # 👈 Must match environment in repo settings
-      url: https://aws.amazon.com/
-
+      name: production
     defaults:
       run:
         working-directory: ${{ env.TF_WORKING_DIR }}
 
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_REGION: ${{ secrets.AWS_REGION }}
-
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Terraform
@@ -100,10 +71,6 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
-      - name: Terraform Validate
-        run: terraform validate
-
-      # ✅ Register Deployment (this makes approval button appear)
       - name: Register Deployment
         uses: chrnorm/deployment-action@v2
         with:
@@ -112,29 +79,20 @@ jobs:
           ref: ${{ github.ref }}
 
       - name: Terraform Plan (Before Apply)
-        id: plan-apply
         run: terraform plan -out=tfplan-apply.out
-
-      - name: Show Apply Plan Output
-        run: terraform show -no-color tfplan-apply.out > plan-apply-output.txt
 
       - name: Upload Apply Plan
         uses: actions/upload-artifact@v4
         with:
           name: tfplan-apply
-          path: |
-            ${{ env.TF_WORKING_DIR }}/tfplan-apply.out
-            ${{ env.TF_WORKING_DIR }}/plan-apply-output.txt
+          path: ${{ env.TF_WORKING_DIR }}/tfplan-apply.out
 
-      # ⏸️ This step will wait for manual approval in GitHub UI
       - name: Wait for Environment Approval
-        run: echo "⏸️ Waiting for environment approval in GitHub..."
+        run: echo "⏸️ Waiting for approval in GitHub environment..."
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan-apply.out
 
       - name: Deployment Success Notification
         if: success()
-        run: |
-          echo "✅ Terraform apply completed successfully!"
-          echo "🚀 Infrastructure has been deployed to AWS!"
+        run: echo "✅ Terraform Apply Successful!"

@@ -1,4 +1,4 @@
-name: Terraform CI/CD (Plan + Apply After Merge)
+name: Terraform CI/CD (Plan + Apply After Merge with Manual Approval)
 
 on:
   pull_request:
@@ -73,9 +73,13 @@ jobs:
           path: ${{ env.TF_WORKING_DIR }}/plan-output.txt
 
   terraform-deploy:
-    name: Terraform Plan + Apply (After Merge)
+    name: Terraform Plan + Apply (After Merge - Manual Approval)
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://aws.amazon.com/
+    needs: terraform-plan
 
     defaults:
       run:
@@ -101,7 +105,7 @@ jobs:
       - name: Terraform Validate
         run: terraform validate
 
-      # 🔹 Fresh plan at deploy time
+      # 🔹 Run fresh plan again before apply
       - name: Terraform Plan (At Deploy)
         id: plan-deploy
         run: terraform plan -out=tfplan-apply.out
@@ -116,6 +120,10 @@ jobs:
           path: |
             ${{ env.TF_WORKING_DIR }}/tfplan-apply.out
             ${{ env.TF_WORKING_DIR }}/plan-apply-output.txt
+
+      # 🔹 This step will wait until approval is given in GitHub UI
+      - name: Wait for Manual Approval
+        run: echo "⏸️ Waiting for manual approval in GitHub environment..."
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan-apply.out

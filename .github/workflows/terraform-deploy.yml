@@ -1,12 +1,11 @@
-name: Terraform CI/CD (Plan + Apply with Manual Approval)
+name: Terraform CI/CD (Plan + Manual Approval + Apply)
 
 on:
   pull_request:
-    branches:
-      - main
+    branches: [main]
+    types: [opened, synchronize, reopened]
   push:
-    branches:
-      - main
+    branches: [main]
 
 permissions:
   contents: read
@@ -33,7 +32,7 @@ jobs:
       AWS_REGION: ${{ secrets.AWS_REGION }}
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Terraform
@@ -41,31 +40,41 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Terraform Init
+      - name: Terraform fmt check
+        run: terraform fmt -check
+
+      - name: Terraform init
         run: terraform init
 
-      - name: Terraform Validate
+      - name: Terraform validate
         run: terraform validate
 
-      - name: Terraform Plan
+      - name: Terraform plan
         id: plan
         run: terraform plan -out=tfplan.out
 
-      - name: Save Plan Output
+      - name: Save plan output (for review)
         run: terraform show -no-color tfplan.out > plan-output.txt
 
-      - name: Upload Plan Artifacts
+      - name: Upload plan artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: tfplan
+          name: terraform-plan
           path: |
             ${{ env.TF_WORKING_DIR }}/tfplan.out
             ${{ env.TF_WORKING_DIR }}/plan-output.txt
 
+      - name: Comment plan result on PR
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: terraform-plan
+          path: ${{ env.TF_WORKING_DIR }}/plan-output.txt
+
   terraform-apply:
-    name: Terraform Apply (After Merge + Manual Approval)
+    name: Terraform Apply (Manual Approval Required)
     runs-on: ubuntu-latest
-    needs: [terraform-plan]
+    needs: terraform-plan
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/main')
     environment:
       name: production
@@ -81,7 +90,7 @@ jobs:
       AWS_REGION: ${{ secrets.AWS_REGION }}
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Terraform
@@ -89,33 +98,42 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Terraform Init
+      - name: Terraform init
         run: terraform init
 
-      - name: Download Plan Artifact
+      - name: Download plan artifact
         uses: actions/download-artifact@v4
         with:
-          name: tfplan
+          name: terraform-plan
           path: ${{ env.TF_WORKING_DIR }}
         continue-on-error: true
 
-      - name: Terraform Plan (Verification)
+      - name: Terraform plan (re-validate before apply)
+        id: verify
         run: terraform plan -out=tfplan-apply.out
 
-      - name: Upload Verified Plan
-        uses: actions/upload-artifact@v4
-        with:
-          name: verified-plan
-          path: ${{ env.TF_WORKING_DIR }}/tfplan-apply.out
+      - name: Show verified plan
+        run: terraform show -no-color tfplan-apply.out
 
-      - name: Wait for Manual Approval
-        run: echo "⏸️ Waiting for environment approval before apply..."
+      # --- Manual approval happens here (via GitHub Environment Protection) ---
 
-      - name: Terraform Apply
+      - name: Terraform apply
         run: terraform apply -auto-approve tfplan-apply.out
 
-      - name: Deployment Success
+      - name: Deployment success message
         if: success()
         run: |
-          echo "✅ Terraform apply completed successfully!"
-          echo "🚀 Infrastructure deployed to AWS region: ${{ env.AWS_REGION }}"
+          echo "✅ Terraform Apply completed successfully!"
+          echo "🚀 Infrastructure deployed to AWS in region: ${{ env.AWS_REGION }}"
+
+      # Optional: Slack or Email notification (uncomment if needed)
+      # - name: Notify Slack
+      #   if: success()
+      #   uses: slackapi/slack-github-action@v1.24.0
+      #   with:
+      #     payload: |
+      #       {
+      #         "text": "✅ Terraform deployment to *production* completed successfully in ${{ env.AWS_REGION }}."
+      #       }
+      #   env:
+      #     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

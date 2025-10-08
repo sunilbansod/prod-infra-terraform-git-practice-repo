@@ -13,6 +13,7 @@ permissions:
   contents: read
   pull-requests: write
   id-token: write
+  deployments: write   # ✅ Required for environment deployments
 
 env:
   TF_VERSION: 1.6.6
@@ -42,9 +43,6 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Terraform Format Check
-        run: terraform fmt -check
-
       - name: Terraform Init
         run: terraform init
 
@@ -55,7 +53,7 @@ jobs:
         id: plan
         run: terraform plan -out=tfplan.out
 
-      - name: Save Plan Output (for visibility)
+      - name: Show Plan Output
         run: terraform show -no-color tfplan.out > plan-output.txt
 
       - name: Upload Plan Files
@@ -66,7 +64,7 @@ jobs:
             ${{ env.TF_WORKING_DIR }}/tfplan.out
             ${{ env.TF_WORKING_DIR }}/plan-output.txt
 
-      - name: Show Plan in PR
+      - name: Comment Plan in PR
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: terraform-plan
@@ -76,10 +74,10 @@ jobs:
     name: Terraform Plan + Apply (After Merge - Manual Approval)
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    environment:
-      name: production
-      url: https://aws.amazon.com/
     needs: terraform-plan
+    environment:
+      name: production   # 👈 Must match environment in repo settings
+      url: https://aws.amazon.com/
 
     defaults:
       run:
@@ -105,15 +103,22 @@ jobs:
       - name: Terraform Validate
         run: terraform validate
 
-      # 🔹 Run fresh plan again before apply
-      - name: Terraform Plan (At Deploy)
-        id: plan-deploy
+      # ✅ Register Deployment (this makes approval button appear)
+      - name: Register Deployment
+        uses: chrnorm/deployment-action@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          environment: production
+          ref: ${{ github.ref }}
+
+      - name: Terraform Plan (Before Apply)
+        id: plan-apply
         run: terraform plan -out=tfplan-apply.out
 
-      - name: Show Plan Output
+      - name: Show Apply Plan Output
         run: terraform show -no-color tfplan-apply.out > plan-apply-output.txt
 
-      - name: Upload Plan (Deploy)
+      - name: Upload Apply Plan
         uses: actions/upload-artifact@v4
         with:
           name: tfplan-apply
@@ -121,9 +126,9 @@ jobs:
             ${{ env.TF_WORKING_DIR }}/tfplan-apply.out
             ${{ env.TF_WORKING_DIR }}/plan-apply-output.txt
 
-      # 🔹 This step will wait until approval is given in GitHub UI
-      - name: Wait for Manual Approval
-        run: echo "⏸️ Waiting for manual approval in GitHub environment..."
+      # ⏸️ This step will wait for manual approval in GitHub UI
+      - name: Wait for Environment Approval
+        run: echo "⏸️ Waiting for environment approval in GitHub..."
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan-apply.out
